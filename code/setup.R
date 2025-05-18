@@ -6,7 +6,8 @@ packages <-  c(
   "ggplot2",
   "haven",
   "cmdstanr",
-  "vroom"
+  "vroom",
+  "posterior"
 )
 
 package.check <- lapply(
