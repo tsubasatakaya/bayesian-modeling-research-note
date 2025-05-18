@@ -28,6 +28,7 @@ base_data <- vroom(file.path(data_path, "base_data.csv"),
          year = factor(year, levels = c(2013, 2017, 2021))) |> 
   mutate(state_id = as.integer(state),
          year_id = as.integer(year),
+         state_year_id = as.integer(factor(interaction(state, year))),
          gender = as.integer(factor(gender, levels = c("male", "female"))),
          education = as.integer(factor(education, levels = c("low", "middle", "high")))
          ) |> 
@@ -37,16 +38,13 @@ base_data <- vroom(file.path(data_path, "base_data.csv"),
 #######################
 # Interaction with year
 #######################
-interaction_data <- base_data |> 
-  mutate(state_year_id = as.integer(factor(interaction(state, year)))
-  )
-state_year_data <- interaction_data |> 
+state_year_data <- base_data |> 
   select(state, state_id, year, year_id, east, unemp_rate, gdp_per_capita) |> 
   distinct()
 
 X <- model.matrix(~ 1 + party_identification_afd + gender +
                   factor(education) + unemp + unemp_past + income,
-                  data = interaction_data) |> 
+                  data = base_data) |> 
   as.data.frame() |> 
   mutate(
     across(all_of(c("unemp_past", "income")), ~ (.- mean(.)) / sd(.)),
@@ -67,16 +65,16 @@ Z <- model.matrix(~ 1 + east*factor(year_id) + gdp_per_capita + unemp_rate,
 Z <- Z[,-1]
 
 data_stan_int <- list(
-  N = nrow(interaction_data),
+  N = nrow(base_data),
   S = length(unique(state_year_data$state_id)),
-  ST = length(unique(interaction_data$state_year_id)),
+  ST = length(unique(base_data$state_year_id)),
   K = ncol(X),
   L = ncol(Z),
   ss = state_year_data$state_id,
-  st = interaction_data$state_year_id,
+  st = base_data$state_year_id,
   X = X,
   Z = Z,
-  y = interaction_data$satis_demo
+  y = base_data$satis_demo
 )
 
 int_model <- "
@@ -155,7 +153,7 @@ fit$save_object(file.path(output_path, "models", "int_party_identification_fitte
 #######################
 X <- model.matrix(~ 1 + party_identification_afd + gender +
                     factor(education) + unemp + unemp_past + income,
-                  data = interaction_data) |> 
+                  data = base_data) |> 
   as.data.frame() |> 
   mutate(
     across(all_of(c("unemp_past", "income")), ~ (.- mean(.)) / sd(.)),
@@ -176,16 +174,16 @@ Z <- model.matrix(~ 1 + east + factor(year_id) + gdp_per_capita + unemp_rate,
 Z <- Z[,-1]
 
 data_stan_no_int <- list(
-  N = nrow(interaction_data),
+  N = nrow(base_data),
   S = length(unique(state_year_data$state_id)),
-  ST = length(unique(interaction_data$state_year_id)),
+  ST = length(unique(base_data$state_year_id)),
   K = ncol(X),
   L = ncol(Z),
   ss = state_year_data$state_id,
-  st = interaction_data$state_year_id,
+  st = base_data$state_year_id,
   X = X,
   Z = Z,
-  y = interaction_data$satis_demo
+  y = base_data$satis_demo
 )
 
 no_int_model <- "
@@ -265,7 +263,7 @@ s <- summarize_draws(fit$draws())
 # Varying slope by year
 #######################
 X <- model.matrix(~ 1 + gender + factor(education) + unemp + unemp_past + income,
-                  data = interaction_data) |> 
+                  data = base_data) |> 
   as.data.frame() |> 
   mutate(
     across(all_of(c("unemp_past", "income")), ~ (.- mean(.)) / sd(.)),
@@ -273,8 +271,8 @@ X <- model.matrix(~ 1 + gender + factor(education) + unemp + unemp_past + income
   ) |> 
   as.matrix()
 X <- X[,-1]
-afd <- scale(interaction_data$party_identification_afd, scale = FALSE)
-
+afd <- scale(base_data$party_identification_afd, scale = FALSE) |> 
+  as.vector()
 
 Z <- model.matrix(~ 1 + factor(year_id) + gdp_per_capita + unemp_rate,
                   data = state_year_data) |> 
@@ -285,22 +283,25 @@ Z <- model.matrix(~ 1 + factor(year_id) + gdp_per_capita + unemp_rate,
   ) |> 
   as.matrix()
 Z <- Z[,-1]
-east <- scale(state_year_data$east, scale = FALSE)
+east <- scale(state_year_data$east, scale = FALSE) |> 
+  as.vector()
 
 data_stan_year_slope <- list(
-  N = nrow(interaction_data),
-  ST = length(unique(interaction_data$state_year_id)),
+  N = nrow(base_data),
+  S = length(unique(state_year_data$state_id)),
+  ST = length(unique(base_data$state_year_id)),
+  TT = length(unique(base_data$year_id)),
   K = ncol(X),
   L = ncol(Z),
-  st = interaction_data$state_year_id,
+  st = base_data$state_year_id,
   ss = state_year_data$state_id,
-  ti = interaction_data$year_id,
+  ti = base_data$year_id,
   ts = state_year_data$year_id,
   X = X,
   afd = afd,
   Z = Z,
   east = east,
-  y = interaction_data$satis_demo
+  y = base_data$satis_demo
 )
 
 year_slope_model <- "
@@ -330,10 +331,10 @@ parameters{
   vector[K] beta_0;      // slopes for individual-level covariates
   vector[L] beta_1;      // slopes for state-year level covariates
   
-  vector[TT] delta_raw  // 
-  vector[TT] tau_raw      //
-  real mu_delta
-  real mu_tau
+  vector[TT] delta_raw;  // 
+  vector[TT] tau_raw;      //
+  real mu_delta;
+  real mu_tau;
   
   real<lower=0> sigma_y;    // between-individual variation
   real<lower=0> sigma_alpha;  // between-state-year variation
@@ -343,8 +344,8 @@ parameters{
 }
 
 transformed parameters {
-  vector[TT] delta = mu_delta + sigma_delta * delta_raw
-  vector[TT] tau = mu_tau + sigma_tau * tau_raw
+  vector[TT] delta = mu_delta + sigma_delta * delta_raw;
+  vector[TT] tau = mu_tau + sigma_tau * tau_raw;
   vector[S] gamma = mu_gamma + sigma_gamma * gamma_raw;  // varying intercept for states
   vector[ST] alpha_mean = gamma[ss] + east .* tau[ts] + Z * beta_1;
   vector[ST] alpha = alpha_mean + sigma_alpha * alpha_raw;  // varying intercept for state-years
@@ -355,42 +356,51 @@ model {
   alpha_raw ~ std_normal();
   delta_raw ~ std_normal();
   tau_raw ~ std_normal();
+  delta ~ normal(0, 10);
   beta_0 ~ normal(0, 10);
   beta_1 ~ normal(0, 10);
-  mu_gamma ~ student_t(3, 0, 1);
-  mu_delta ~ student_t(3, 0, 1);
-  mu_tau ~ student_t(3, 0, 1);
-  sigma_y ~ student_t(3, 0, 1);
-  sigma_gamma ~ student_t(3, 0, 1);
-  sigma_alpha ~ student_t(3, 0, 1);
-  
+  mu_gamma ~ normal(0, 10);
+  mu_delta ~ normal(0, 10);
+  mu_tau ~ normal(0, 10);
+  sigma_y ~ normal(0, 10);
+  sigma_gamma ~ normal(0, 2);
+  sigma_alpha ~ normal(0, 2);
+  sigma_delta ~ normal(0, 2);
+  sigma_tau ~ normal(0, 2);
   
   // likelihood
   y ~ normal(alpha[st] + afd .* delta[ti] + X * beta_0, sigma_y);
 }
 "
 # Save .stan file
-write(int_model, file.path(stan_path, "no_int_model_party_identification.stan"))
+write(year_slope_model, file.path(stan_path, "year_slope_model_party_identification.stan"))
 
 # Compile model
-int_model_compiled <- cmdstan_model(file.path(stan_path, "no_int_model_party_identification.stan"))
+year_slope_model_compiled <- cmdstan_model(file.path(stan_path, 
+                                                     "year_slope_model_party_identification.stan"))
 
 # sample from the posterior
-fit <- int_model_compiled$sample(
-  data = data_stan_int,
+fit <- year_slope_model_compiled$sample(
+  data = data_stan_year_slope,
   seed = 1457L,
   parallel_chains = 4,
   chains = 4,
   iter_warmup = 2000,
   iter_sampling = 1000,
   refresh = 50,
-  output_dir = file.path(posterior_path, "fe_model"),
-  output_basename = "party_identification_no_int",
+  adapt_delta = 0.98,
+  output_dir = file.path(posterior_path, "varying_slope_model"),
+  output_basename = "party_identification",
   save_warmup = TRUE,
-  save_metric = TRUE,
+  save_metric = FALSE,
   save_cmdstan_config = FALSE
 )
-fit$save_object(file.path(output_path, "models", "no_int_party_identification_fitted.RDS"))
+fit$save_object(file.path(output_path, "models", "year_slope_party_identification_fitted.RDS"))
+
+
+
+
+
 
 
 

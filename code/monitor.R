@@ -34,7 +34,7 @@ all_files <- list.files(file.path(posterior_path, "varying_slope_model"),
                         pattern = "\\.csv$")
 files_to_read <- all_files[grep("^party_identification", all_files)]
 
-delta_sample <- "delta.3"
+delta_sample <- "delta.1"
 posterior <- files_to_read |> 
   imap_dfr(~ monitor_chains(.x,
                             save_path = file.path(posterior_path, "varying_slope_model"),
