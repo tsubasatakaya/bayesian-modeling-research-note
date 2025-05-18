@@ -5,7 +5,8 @@ packages <-  c(
   "tidyverse", 
   "ggplot2",
   "haven",
-  "cmdstanr"
+  "cmdstanr",
+  "vroom"
 )
 
 package.check <- lapply(
