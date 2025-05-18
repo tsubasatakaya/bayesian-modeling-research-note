@@ -15,12 +15,14 @@ import_posterior_files <- function(file_name,
       message("Warmup is not saved. Ignoring include_warmup.")
     }
     df <- vroom::vroom(file.path(save_path, file_name),
+                       delim = ",",
                        comment = "#",
                        col_select = vroom::starts_with(parameters))
   } else {
     num_warmup <- as.integer(stringr::str_extract(meta[[1]][8], "\\d+"))
     
     df <- vroom::vroom(file.path(save_path, file_name),
+                       delim = ",",
                        comment = "#",
                        col_select = vroom::starts_with(parameters)) |> 
       slice(num_warmup + 1:n())
