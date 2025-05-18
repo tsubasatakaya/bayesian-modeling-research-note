@@ -38,19 +38,30 @@ base_data <- vroom(file.path(data_path, "base_data.csv"),
 # Interaction with year
 #######################
 interaction_data <- base_data |> 
-  mutate(east_year = as.integer(factor(interaction(east, year_id))),
-         state_year_id = as.integer(factor(interaction(state, year)))
+  mutate(state_year_id = as.integer(factor(interaction(state, year)))
   )
 state_year_data <- interaction_data |> 
-  select(state, state_id, year, year_id, east, east_year, unemp_rate, gdp_per_capita) |> 
+  select(state, state_id, year, year_id, east, unemp_rate, gdp_per_capita) |> 
   distinct()
 
 X <- model.matrix(~ -1 + party_identification_afd + gender +
                   factor(education) + unemp + unemp_past + income + factor(year_id),
-                  data = interaction_data)
-Z <- model.matrix(~ -1 + east + factor(east_year) + gdp_per_capita + unemp_rate +
-                    factor(year_id),
-                  data = state_year_data)
+                  data = interaction_data) |> 
+  as.data.frame() |> 
+  mutate(
+    across(all_of(c("unemp_past", "income")), ~ (.- mean(.)) / sd(.)),
+    across(-all_of(c("unemp_past", "income")), ~ . - mean(.))
+  ) |> 
+  as.matrix()
+
+Z <- model.matrix(~ -1 + east*factor(year_id) + gdp_per_capita + unemp_rate,
+                  data = state_year_data) |> 
+  as.data.frame() |> 
+  mutate(
+    across(all_of(c("gdp_per_capita", "unemp_rate")), ~ (.- mean(.)) / sd(.)),
+    across(-all_of(c("gdp_per_capita", "unemp_rate")), ~ . - mean(.))
+  ) |> 
+  as.matrix()
 
 data_stan_int <- list(
   N = nrow(interaction_data),
@@ -82,16 +93,14 @@ data {
   array[N]  int<lower=1, upper=ST> st;  // State-year ID
   matrix[N, K] X;                  // Individual-level covariates
   matrix[ST, L] Z;                      // State-level covariates
-  array[N] int<lower=1> y;        // Outcome
+  array[N] real y;        // Outcome
 }
 
 parameters{
   vector[S] gamma_raw;   // standard normal raw state intercept
   vector[ST] alpha_raw;   // standard normal raw state-year intercept
-  vector[ST] alpha;      // varying intercept for state-years
   vector[K] beta_0;      // slopes for individual-level covariates
   vector[L] beta_1;      // slopes for state-year level covariates
-  vector[S] gamma;       // varying intercept for states
   vector[TT] phi_0;     // varying intercept for years (individual-level)
   vector[TT] phi_1;     // varying intercept for years (state-level)
   real mu_gamma;        // average across states
@@ -102,17 +111,23 @@ parameters{
 }
 
 transformed parameters {
-  vector[S] gamma = mu_gamma + sigma_gamma * gamma_raw;
+  vector[S] gamma = mu_gamma + sigma_gamma * gamma_raw;  // varying intercept for states
+  vector[ST] alpha_mean = gamma[ss] + Z * beta_1 + phi_0[ts];
+  vector[ST] alpha = alpha_mean + sigma_alpha * alpha_raw;  // varying intercept for state-years
 }
 
 model {
+  gamma_raw ~ std_normal();
+  alpha_raw ~ std_normal();
   beta_0 ~ normal(0, 10);
   beta_1 ~ normal(0, 10);
-  gamma ~ normal(mu_gamma, sigma_gamma);
   mu_gamma ~ normal(0, 10);
   phi_0 ~ normal(0, 10);
   phi_1 ~ normal(0, 10);
-  alpha ~ normal(gamma[ss] + Z * beta_1 + phi_0[ts], sigma_alpha);
+  sigma_y ~ normal(0, 10);
+  sigma_gamma ~ normal(0, 2);
+  sigma_alpha ~ normal(0, 2);
+  
   
   // likelihood
   y ~ normal(alpha[st] + X * beta_0 + phi_1[ti], sigma_y);
@@ -139,21 +154,113 @@ fit <- int_model_compiled$sample(
   save_metric = TRUE,
   save_cmdstan_config = FALSE
 )
+fit$save_object(file.path(output_path, "models", "int_party_identification_fitted.RDS"))
 
 
+#######################
+# No interaction
+#######################
+Z <- model.matrix(~ -1 + east + factor(year_id) + gdp_per_capita + unemp_rate,
+                  data = state_year_data) |> 
+  as.data.frame() |> 
+  mutate(
+    across(all_of(c("gdp_per_capita", "unemp_rate")), ~ (.- mean(.)) / sd(.)),
+    across(-all_of(c("gdp_per_capita", "unemp_rate")), ~ . - mean(.))
+  ) |> 
+  as.matrix()
 
+data_stan_int <- list(
+  N = nrow(interaction_data),
+  S = length(unique(state_year_data$state_id)),
+  TT = length(unique(interaction_data$year_id)),
+  ST = length(unique(interaction_data$state_year_id)),
+  K = ncol(X),
+  L = ncol(Z),
+  ss = state_year_data$state_id,
+  ti = interaction_data$year_id,
+  ts = state_year_data$year_id,
+  st = interaction_data$state_year_id,
+  X = X,
+  Z = Z,
+  y = interaction_data$satis_demo
+)
 
+int_model <- "
+data {
+  int<lower=1> N;                   // Number of observations
+  int<lower=1> S;                  // Number of states
+  int<lower=1> TT;                  // Number of election years
+  int<lower=1> ST;                 // Number of state-year combinations
+  int<lower=1> K;                  // Number of individual-level covariates
+  int<lower=1> L;                  // Number of state-level covariates
+  array[ST] int<lower=1, upper=S> ss;  // State ID
+  array[N] int<lower=1, upper=TT> ti;  // Year ID for individual-level data
+  array[ST] int<lower=1, upper=TT> ts;  // Year ID for state-level data
+  array[N]  int<lower=1, upper=ST> st;  // State-year ID
+  matrix[N, K] X;                  // Individual-level covariates
+  matrix[ST, L] Z;                      // State-level covariates
+  array[N] real y;        // Outcome
+}
 
+parameters{
+  vector[S] gamma_raw;   // standard normal raw state intercept
+  vector[ST] alpha_raw;   // standard normal raw state-year intercept
+  vector[K] beta_0;      // slopes for individual-level covariates
+  vector[L] beta_1;      // slopes for state-year level covariates
+  vector[TT] phi_0;     // varying intercept for years (individual-level)
+  vector[TT] phi_1;     // varying intercept for years (state-level)
+  real mu_gamma;        // average across states
+  
+  real<lower=0> sigma_y;    // between-individual variation
+  real<lower=0> sigma_alpha;  // between-state-year variation
+  real<lower=0> sigma_gamma;  // between-state variation
+}
 
+transformed parameters {
+  vector[S] gamma = mu_gamma + sigma_gamma * gamma_raw;  // varying intercept for states
+  vector[ST] alpha_mean = gamma[ss] + Z * beta_1 + phi_0[ts];
+  vector[ST] alpha = alpha_mean + sigma_alpha * alpha_raw;  // varying intercept for state-years
+}
 
+model {
+  gamma_raw ~ std_normal();
+  alpha_raw ~ std_normal();
+  beta_0 ~ normal(0, 10);
+  beta_1 ~ normal(0, 10);
+  mu_gamma ~ normal(0, 10);
+  phi_0 ~ normal(0, 10);
+  phi_1 ~ normal(0, 10);
+  sigma_y ~ normal(0, 10);
+  sigma_gamma ~ normal(0, 2);
+  sigma_alpha ~ normal(0, 2);
+  
+  
+  // likelihood
+  y ~ normal(alpha[st] + X * beta_0 + phi_1[ti], sigma_y);
+}
+"
+# Save .stan file
+write(int_model, file.path(stan_path, "int_model_party_identification.stan"))
 
+# Compile model
+int_model_compiled <- cmdstan_model(file.path(stan_path, "int_model_party_identification.stan"))
 
-
-
-
-
-
-
+# sample from the posterior
+fit <- int_model_compiled$sample(
+  data = data_stan_int,
+  seed = 1457L,
+  parallel_chains = 4,
+  chains = 4,
+  iter_warmup = 2000,
+  iter_sampling = 1000,
+  refresh = 50,
+  output_dir = file.path(posterior_path, "int_model"),
+  output_basename = "party_identification",
+  save_warmup = TRUE,
+  save_metric = TRUE,
+  save_cmdstan_config = FALSE
+)
+fit$save_object(file.path(output_path, "models", "int_party_identification_fitted.RDS"))
 
 
 
