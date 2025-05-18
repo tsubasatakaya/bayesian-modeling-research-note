@@ -34,14 +34,14 @@ base_data <- vroom(file.path(data_path, "base_data.csv"),
          ) |> 
   filter(party_identification > 0)
 
-
-#######################
-# Interaction with year
-#######################
 state_year_data <- base_data |> 
   select(state, state_id, year, year_id, east, unemp_rate, gdp_per_capita) |> 
   distinct()
 
+
+#######################
+# Interaction with year
+#######################
 X <- model.matrix(~ 1 + party_identification_afd + gender +
                   factor(education) + unemp + unemp_past + income,
                   data = base_data) |> 
