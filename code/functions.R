@@ -1,8 +1,9 @@
 import_posterior_files <- function(file_name, save_path, parameters) {
-  df <- read_csv(file.path(save_path, file_name),
-                 comment = "#",
-                 col_select = starts_with(parameters))
+  df <- vroom(file.path(save_path, file_name),
+              comment = "#",
+              col_select = vroom::starts_with(parameters))
   gc()
+  print(nrow(df))
   return(df)
 }
 
