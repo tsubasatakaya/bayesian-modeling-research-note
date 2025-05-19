@@ -4,6 +4,7 @@
 packages <-  c(
   "tidyverse", 
   "ggplot2",
+  "ggridges",
   "haven",
   "cmdstanr",
   "vroom",
