@@ -7,7 +7,8 @@ packages <-  c(
   "haven",
   "cmdstanr",
   "vroom",
-  "posterior"
+  "posterior",
+  "data.table"
 )
 
 package.check <- lapply(
