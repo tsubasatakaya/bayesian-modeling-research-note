@@ -75,39 +75,32 @@ all_files <- list.files(file.path(posterior_path, "varying_slope_model"),
                         pattern = "\\.csv$")
 files_to_read <- all_files[grep("^party_identification", all_files)]
 
+# n_sample * n_state_year matrix
 alpha_posterior <- files_to_read |> 
   map_dfr(~ import_posterior_files(.x,
                                    save_path = file.path(posterior_path, "varying_slope_model"),
                                    parameters = "alpha",
                                    include_warmup = FALSE)) |> 
   select(!any_of(dplyr::contains("raw")) & !any_of(dplyr::contains("mean"))) |> 
-  pivot_longer(everything(), values_to = "alpha") |> 
-  mutate(state_year_id = as.integer(str_extract(name, "\\d+"))) |> 
-  mutate(draw = 1:n(), .by = state_year_id) |> 
-  select(- name)
+  as.matrix()
 
+# n_sample * n_year matrix
 delta_posterior <- files_to_read |> 
   map_dfr(~ import_posterior_files(.x,
                                    save_path = file.path(posterior_path, "varying_slope_model"),
                                    parameters = "delta",
                                    include_warmup = FALSE)) |> 
   select(!any_of(dplyr::contains("raw"))) |> 
-  pivot_longer(everything(), values_to = "delta") |> 
-  mutate(year_id = as.integer(str_extract(name, "\\d+"))) |> 
-  mutate(draw = 1:n(), .by = year_id) |> 
-  select(- name)
+  as.matrix()
 
+# n_sample * n_covariate_X matrix
 beta_0_posterior <- files_to_read |> 
   map_dfr(~ import_posterior_files(.x,
                                    save_path = file.path(posterior_path, "varying_slope_model"),
                                    parameters = "beta_0",
                                    include_warmup = FALSE)) |> 
-  select(!any_of(dplyr::contains("raw"))) |> 
-  mutate(draw = 1:n())
+  select(!any_of(dplyr::contains("raw")))
 
-combined_posterior <- alpha_posterior |> 
-  left_join(delta_posterior, by = "draw", relationship = "many-to-many") |> 
-  left_join(beta_0_posterior, by = "draw", relationship = "many-to-one")
 
 ################################################################################
 # Summarize posterior
@@ -119,24 +112,47 @@ data_new <- tibble(
 ) |> 
   bind_cols(X)
 afd_data_new <- data_new |> 
-  filter(party_identification_afd == max(party_identification_afd)) |> 
-  mutate(n = 1:n())
+  filter(party_identification_afd == max(party_identification_afd))
 non_afd_data_new <- data_new |> 
-  filter(party_identification_afd == min(party_identification_afd)) |> 
-  mutate(n = 1:n())
-
-linpred_afd <- expand_grid(n = 1:nrow(afd_data_new),
-                           draw = 1:4000) |> 
-  left_join(afd_data_new, by = "n") |> 
-  left_join(combined_posterior, by = "draw")
-linpred_non_afd <- expand_grid(n = 1:nrow(non_afd_data_new),
-                               draw = 1:4000) |> 
-  left_join(non_afd_data_new, by = "n") |> 
-  left_join(combined_posterior, by = c("draw", "year_id","state_year_id"))
+  filter(party_identification_afd == min(party_identification_afd))
 
 
+### AfD supporters
+# Subset relevant parameters
+alpha_afd <- alpha_posterior[, afd_data_new$state_year_id] # n_sample * N_afd
+delta_afd <- delta_posterior[, afd_data_new$year_id]  # n_sample * N_afd
+linpred_afd <- t(alpha_afd) + 
+  t(delta_afd) * afd_data_new$party_identification_afd +
+  as.matrix(afd_data_new[,colnames(X)]) %*% t(beta_0_posterior)  # N_afd * n_sample
 
+# Aggregate over observations by year_id
+pred_afd <- data.table(year_id = afd_data_new$year_id)
+draw_names <- paste0(seq_len(ncol(linpred_afd)))
+pred_afd[, (draw_names) := as.data.table(linpred_afd)]
+pred_afd <- pred_afd[, lapply(.SD, mean), by = year_id, .SDcols = draw_names]
+pred_afd_longer <- pred_afd |> 
+  as_tibble() |> 
+  pivot_longer(cols = !year_id,
+               names_to = "draw",
+               values_to = "y_pred")
 
+### Non-AfD supporters
+# Subset relevant parameters
+alpha_non_afd <- alpha_posterior[, non_afd_data_new$state_year_id] # n_sample * N_nonafd
+delta_non_afd <- delta_posterior[, non_afd_data_new$year_id]  # n_sample * N_nonafd
+linpred_non_afd <- t(alpha_non_afd) + 
+  t(delta_non_afd) * non_afd_data_new$party_identification_afd +
+  as.matrix(non_afd_data_new[,colnames(X)]) %*% t(beta_0_posterior)  # N_nonafd * n_sample
+
+# Aggregate over observations by year_id
+pred_non_afd <- data.table(year_id = non_afd_data_new$year_id)
+pred_non_afd[, (draw_names) := as.data.table(linpred_non_afd)]
+pred_non_afd <- pred_non_afd[, lapply(.SD, mean), by = year_id, .SDcols = draw_names]
+pred_non_afd_longer <- pred_non_afd |> 
+  as_tibble() |> 
+  pivot_longer(cols = !year_id,
+               names_to = "draw",
+               values_to = "y_pred")
 
 
 
