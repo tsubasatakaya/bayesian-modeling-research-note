@@ -39,3 +39,13 @@ monitor_chains <- function(file_name, save_path, parameters) {
   gc()
   return(df)
 }
+
+map_year_id_to_year <- function(df) {
+  df |> 
+    mutate(year = case_match(year_id,
+                             1 ~ 2013,
+                             2 ~ 2017,
+                             3 ~ 2021
+                             )
+           )
+}
