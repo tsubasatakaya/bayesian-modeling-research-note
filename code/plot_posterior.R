@@ -112,11 +112,27 @@ combined_posterior <- alpha_posterior |>
 ################################################################################
 # Summarize posterior
 ################################################################################
+data_new <- tibble(
+  state_year_id = base_data$state_year_id,
+  year_id = base_data$year_id,
+  party_identification_afd = afd,
+) |> 
+  bind_cols(X)
+afd_data_new <- data_new |> 
+  filter(party_identification_afd == max(party_identification_afd)) |> 
+  mutate(n = 1:n())
+non_afd_data_new <- data_new |> 
+  filter(party_identification_afd == min(party_identification_afd)) |> 
+  mutate(n = 1:n())
 
-
-
-
-
+linpred_afd <- expand_grid(n = 1:nrow(afd_data_new),
+                           draw = 1:4000) |> 
+  left_join(afd_data_new, by = "n") |> 
+  left_join(combined_posterior, by = "draw")
+linpred_non_afd <- expand_grid(n = 1:nrow(non_afd_data_new),
+                               draw = 1:4000) |> 
+  left_join(non_afd_data_new, by = "n") |> 
+  left_join(combined_posterior, by = c("draw", "year_id","state_year_id"))
 
 
 
