@@ -86,6 +86,52 @@ alpha_posterior <- files_to_read |>
   mutate(draw = 1:n(), .by = state_year_id) |> 
   select(- name)
 
+delta_posterior <- files_to_read |> 
+  map_dfr(~ import_posterior_files(.x,
+                                   save_path = file.path(posterior_path, "varying_slope_model"),
+                                   parameters = "delta",
+                                   include_warmup = FALSE)) |> 
+  select(!any_of(dplyr::contains("raw"))) |> 
+  pivot_longer(everything(), values_to = "delta") |> 
+  mutate(year_id = as.integer(str_extract(name, "\\d+"))) |> 
+  mutate(draw = 1:n(), .by = year_id) |> 
+  select(- name)
+
+beta_0_posterior <- files_to_read |> 
+  map_dfr(~ import_posterior_files(.x,
+                                   save_path = file.path(posterior_path, "varying_slope_model"),
+                                   parameters = "beta_0",
+                                   include_warmup = FALSE)) |> 
+  select(!any_of(dplyr::contains("raw"))) |> 
+  mutate(draw = 1:n())
+
+combined_posterior <- alpha_posterior |> 
+  left_join(delta_posterior, by = "draw", relationship = "many-to-many") |> 
+  left_join(beta_0_posterior, by = "draw", relationship = "many-to-one")
+
+################################################################################
+# Summarize posterior
+################################################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
