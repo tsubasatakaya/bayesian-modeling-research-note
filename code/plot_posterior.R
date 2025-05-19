@@ -101,6 +101,15 @@ beta_0_posterior <- files_to_read |>
                                    include_warmup = FALSE)) |> 
   select(!any_of(dplyr::contains("raw")))
 
+# n_sample * n_year matrix
+tau_posterior <- files_to_read |> 
+  map_dfr(~ import_posterior_files(.x,
+                                   save_path = file.path(posterior_path, "varying_slope_model"),
+                                   parameters = "tau",
+                                   include_warmup = FALSE)) |> 
+  select(!any_of(dplyr::contains("raw"))) |> 
+  as.matrix()
+
 
 ################################################################################
 # Summarize posterior
@@ -108,10 +117,60 @@ beta_0_posterior <- files_to_read |>
 #===================
 # Posterior distribution of parameters
 #===================
-delta_posterior_long
+delta_posterior_long <- delta_posterior |> 
+  as_tibble() |> 
+  pivot_longer(everything(), names_to = "name") |> 
+  mutate(year_id = as.integer(str_extract(name, "\\d+")),
+         parameter = "delta") |> 
+  select(-name) |> 
+  map_year_id_to_year()
+  
+delta_summary <- delta_posterior_long |> 
+  summarize(lower = quantile(value, 0.025),
+            upper = quantile(value, 0.975),
+            point = mean(value),
+            .by = year)
+
+delta_summary |> 
+  mutate(year = factor(year)) |> 
+  ggplot(aes(x = year, y = point)) +
+  geom_pointrange(aes(x = year, y = point, ymin = lower, ymax = upper)) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  theme_bw()
+
+tau_posteior_long <- tau_posterior |> 
+  as_tibble() |> 
+  pivot_longer(everything(), names_to = "name") |> 
+  mutate(year_id = as.integer(str_extract(name, "\\d+")),
+         parameter = "tau") |> 
+  select(-name) |> 
+  map_year_id_to_year()
 
 
+combined_posterior_long <- bind_rows(delta_posterior_long, tau_posteior_long) |> 
+  mutate(year = factor(year),
+         parameter = factor(parameter, levels = c("delta", "tau")))
 
+library(ggridges)
+combined_posterior_long |> 
+  ggplot(aes(x = value, y = fct_rev(year))) +
+  geom_density_ridges(scale = 1.2, 
+                      rel_min_height = 0.01, 
+                      color = "black",
+                      fill = "gray70",
+                      alpha = 0.6) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  facet_wrap(~ parameter, scales = "free_x",
+             labeller = labeller(parameter = c("delta" = "\u03B4",
+                                               "tau" = "\u03C4"))) +
+  theme_minimal() +
+  labs(x = "Coefficient", y = "") +
+  theme(
+    strip.text.x = element_text(face = "bold", size = 14),
+    axis.text.y = element_text(size = 12),              
+    axis.title.x = element_text(size = 13),
+    panel.grid.minor = element_blank()
+  )
 
 
 
