@@ -54,8 +54,7 @@ X <- model.matrix(~ 1 + gender + factor(education) + unemp + unemp_past
   ) |> 
   as.matrix()
 X <- X[,-1]
-afd <- scale(base_data$vote_int_second_afd, scale = FALSE) |> 
-  as.vector()
+afd <- base_data$vote_int_second_afd
 
 Z <- model.matrix(~ 1 + factor(year_id) + gdp_per_capita + unemp_rate,
                   data = state_year_data) |> 
@@ -66,8 +65,7 @@ Z <- model.matrix(~ 1 + factor(year_id) + gdp_per_capita + unemp_rate,
   ) |> 
   as.matrix()
 Z <- Z[,-1]
-east <- scale(state_year_data$east, scale = FALSE) |> 
-  as.vector()
+east <- state_year_data$east
 
 ################################################################################
 # Prepare posterior
@@ -168,9 +166,9 @@ data_new <- tibble(
 ) |> 
   bind_cols(X)
 afd_data_new <- data_new |> 
-  filter(vote_int_second_afd == max(vote_int_second_afd))
+  filter(vote_int_second_afd == 1)
 non_afd_data_new <- data_new |> 
-  filter(vote_int_second_afd == min(vote_int_second_afd))
+  filter(vote_int_second_afd == 0)
 
 
 ### AfD supporters
@@ -196,9 +194,7 @@ pred_afd_long <- pred_afd |>
 ### Non-AfD supporters
 # Subset relevant parameters
 alpha_non_afd <- alpha_posterior[, non_afd_data_new$state_year_id] # n_sample * N_nonafd
-delta_non_afd <- delta_posterior[, non_afd_data_new$year_id]  # n_sample * N_nonafd
 linpred_non_afd <- t(alpha_non_afd) + 
-  t(delta_non_afd) * non_afd_data_new$vote_int_second_afd +
   as.matrix(non_afd_data_new[,colnames(X)]) %*% t(beta_0_posterior)  # N_nonafd * n_sample
 
 # Aggregate over observations by year_id
