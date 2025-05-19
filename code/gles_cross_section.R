@@ -39,9 +39,7 @@ vars_to_check <- c(
   "year",
   "east_west_1",
   "satis_demo",
-  # "vote_int_party",
   "person_econ_current",
-  # "party_identification",
   "school_certificate",
   "employment",
   "unemp_past",
@@ -58,9 +56,11 @@ for (i in seq_along(years)) {
            gender = factor(as.integer(haven::as_factor(gender)),
                            labels = c("male", "female"))
            )|> 
-    mutate(vote_int_party_label = as.character(haven::as_factor(vote_int_party)),
-           .after = vote_int_party
+    mutate(vote_int_first_label = as.character(haven::as_factor(vote_int_first)),
+           .after = vote_int_first
            ) |> 
+    mutate(vote_int_second_label = as.character(haven::as_factor(vote_int_second)),
+           .after = vote_int_second) |> 
     mutate(party_identification_label = as.character(haven::as_factor(party_identification)),
            .after = party_identification
            ) |> 
@@ -70,9 +70,9 @@ for (i in seq_along(years)) {
     select(-year_birth)
   
   df <- df |> 
-    mutate(across(c(east_west_1, satis_demo, vote_int_party, party_identification, 
-                    person_econ_current, school_certificate,employment, 
-                    unemp_past, income), as.integer))
+    mutate(across(c(east_west_1, satis_demo, vote_int_first, vote_int_second, 
+                    party_identification, person_econ_current, 
+                    school_certificate,employment, unemp_past, income), as.integer))
   
   if ("east_west_2" %in% colnames(df)) {
     df <-  df |> 
@@ -93,7 +93,8 @@ cleaned_gles_data <- gles_data |>
     .default = state
   )) |> 
   mutate(state = factor(state, levels = states)) |> 
-  mutate(vote_int_afd = ifelse(vote_int_party_label == "AfD", 1, 0),
+  mutate(vote_int_first_afd = ifelse(vote_int_first_label == "AfD", 1, 0),
+         vote_int_second_afd = ifelse(vote_int_second_label == "AfD", 1, 0),
          party_identification_afd = ifelse(party_identification_label == "AfD", 1, 0),
          education = case_when(school_certificate %in% c(1, 2) ~ "low",
                                school_certificate %in% c(3, 4, 6) ~ "middle",
@@ -105,7 +106,7 @@ cleaned_gles_data <- gles_data |>
   mutate(education = factor(education, levels = c("low", "middle", "high")),
          satis_demo = 6 - satis_demo) |> # reverse order s.t. 1 = not satisfied, 5 = very satisfied
   select(year, ID, state, east, gender, age, satis_demo,
-         vote_int_party, vote_int_afd, 
+         vote_int_first, vote_int_first_afd, vote_int_second, vote_int_second_afd, 
          party_identification, party_identification_afd,
          person_econ_current, education, unemp, unemp_past,
          income) |> 
