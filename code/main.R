@@ -52,8 +52,6 @@ X <- model.matrix(~ 1 + gender + factor(education) + unemp + unemp_past
   ) |> 
   as.matrix()
 X <- X[,-1]
-# afd <- scale(base_data$vote_int_second_afd, scale = FALSE) |> 
-#   as.vector()
 afd <- base_data$vote_int_second_afd
 
 Z <- model.matrix(~ 1 + factor(year_id) + gdp_per_capita + unemp_rate,
@@ -65,8 +63,6 @@ Z <- model.matrix(~ 1 + factor(year_id) + gdp_per_capita + unemp_rate,
   ) |> 
   as.matrix()
 Z <- Z[,-1]
-# east <- scale(state_year_data$east, scale = FALSE) |> 
-#   as.vector()
 east <- state_year_data$east
 
 data_stan_year_slope <- list(
