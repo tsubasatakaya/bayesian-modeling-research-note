@@ -32,7 +32,7 @@ ggplot(data = posterior) +
 #######################
 all_files <- list.files(file.path(posterior_path, "varying_slope_model"),
                         pattern = "\\.csv$")
-files_to_read <- all_files[grep("^party_identification", all_files)]
+files_to_read <- all_files[grep("^vote_intention_second", all_files)]
 
 delta_sample <- "delta.3"
 posterior <- files_to_read |> 
@@ -48,4 +48,5 @@ posterior <- files_to_read |>
 
 ggplot(data = posterior) +
   geom_line(aes(x = iter, y = value, color = as.factor(chain))) +
-  facet_wrap(~parameter, scales = "free")
+  facet_wrap(~parameter, scales = "free") +
+  scale_y_continuous(limits = c(-2, 0))
