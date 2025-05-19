@@ -106,7 +106,17 @@ beta_0_posterior <- files_to_read |>
 # Summarize posterior
 ################################################################################
 #===================
-# Population averged predictions
+# Posterior distribution of parameters
+#===================
+delta_posterior_long
+
+
+
+
+
+
+#===================
+# Population averaged predictions
 #===================
 
 data_new <- tibble(
@@ -134,7 +144,7 @@ pred_afd <- data.table(year_id = afd_data_new$year_id)
 draw_names <- paste0(seq_len(ncol(linpred_afd)))
 pred_afd[, (draw_names) := as.data.table(linpred_afd)]
 pred_afd <- pred_afd[, lapply(.SD, mean), by = year_id, .SDcols = draw_names]
-pred_afd_longer <- pred_afd |> 
+pred_afd_long <- pred_afd |> 
   as_tibble() |> 
   pivot_longer(cols = !year_id,
                names_to = "draw",
@@ -153,14 +163,14 @@ linpred_non_afd <- t(alpha_non_afd) +
 pred_non_afd <- data.table(year_id = non_afd_data_new$year_id)
 pred_non_afd[, (draw_names) := as.data.table(linpred_non_afd)]
 pred_non_afd <- pred_non_afd[, lapply(.SD, mean), by = year_id, .SDcols = draw_names]
-pred_non_afd_longer <- pred_non_afd |> 
+pred_non_afd_long <- pred_non_afd |> 
   as_tibble() |> 
   pivot_longer(cols = !year_id,
                names_to = "draw",
                values_to = "y_pred") |> 
   mutate(group = "non-afd")
 
-pop_pred_summary <- rbind(pred_afd_longer, pred_non_afd_longer) |> 
+pop_pred_summary <- rbind(pred_afd_long, pred_non_afd_long) |> 
   summarize(lower = quantile(y_pred, 0.025),
             upper = quantile(y_pred, 0.975),
             point = mean(y_pred),
