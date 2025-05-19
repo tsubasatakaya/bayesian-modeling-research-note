@@ -105,6 +105,10 @@ beta_0_posterior <- files_to_read |>
 ################################################################################
 # Summarize posterior
 ################################################################################
+#===================
+# Population averged predictions
+#===================
+
 data_new <- tibble(
   state_year_id = base_data$state_year_id,
   year_id = base_data$year_id,
@@ -134,7 +138,8 @@ pred_afd_longer <- pred_afd |>
   as_tibble() |> 
   pivot_longer(cols = !year_id,
                names_to = "draw",
-               values_to = "y_pred")
+               values_to = "y_pred") |> 
+  mutate(group = "afd")
 
 ### Non-AfD supporters
 # Subset relevant parameters
@@ -152,13 +157,26 @@ pred_non_afd_longer <- pred_non_afd |>
   as_tibble() |> 
   pivot_longer(cols = !year_id,
                names_to = "draw",
-               values_to = "y_pred")
+               values_to = "y_pred") |> 
+  mutate(group = "non-afd")
 
+pop_pred_summary <- rbind(pred_afd_longer, pred_non_afd_longer) |> 
+  summarize(lower = quantile(y_pred, 0.025),
+            upper = quantile(y_pred, 0.975),
+            point = mean(y_pred),
+            .by = c("group", "year_id")) |> 
+  mutate(year = case_match(
+    year_id,
+    1 ~ 2013,
+    2 ~ 2017,
+    3 ~ 2021
+  ))
 
-
-
-
-
+pop_pred_summary |> 
+  mutate(year = factor(year)) |> 
+  ggplot(aes(x = year, y = point, color = group)) +
+  geom_pointrange(aes(x = year, y = point, ymin = lower, ymax = upper),
+                  position = position_dodge(width = 0.8))
 
 
 
