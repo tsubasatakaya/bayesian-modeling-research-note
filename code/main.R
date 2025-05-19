@@ -87,49 +87,51 @@ data_stan_year_slope <- list(
 
 year_slope_model <- "
 data {
-  int<lower=1> N;                   // Number of observations
-  int<lower=1> S;                  // Number of states
-  int<lower=1> ST;                 // Number of state-year combinations
-  int<lower=1> TT;                 // Number of election years
-  int<lower=1> K;                  // Number of individual-level covariates
-  int<lower=1> L;                  // Number of state-level covariates
-  array[N]  int<lower=1, upper=ST> st;  // State-year ID
-  array[ST] int<lower=1, upper=S> ss;  // State ID
-  array[N]  int<lower=1, upper=TT> ti;  // Year ID (individual-level)
-  array[ST] int<lower=1, upper=TT> ts;  // Year ID (state-level)
-  matrix[N, K] X;                  // Individual-level covariates
-  vector[N] afd;                   // AfD support
-  matrix[ST, L] Z;                      // State-level covariates
-  vector[ST]  east;                     // East Germany dummy
-  array[N] real y;        // Outcome
+  int<lower=1> N;                         // Number of observations
+  int<lower=1> S;                         // Number of states
+  int<lower=1> ST;                        // Number of state-year combinations
+  int<lower=1> TT;                        // Number of election years
+  int<lower=1> K;                         // Number of individual-level covariates
+  int<lower=1> L;                         // Number of state-level covariates
+  array[N]  int<lower=1, upper=ST> st;    // State-year ID
+  array[ST] int<lower=1, upper=S> ss;     // State ID
+  array[N]  int<lower=1, upper=TT> ti;    // Year ID (individual-level)
+  array[ST] int<lower=1, upper=TT> ts;    // Year ID (state-level)
+  matrix[N, K] X;                         // Individual-level covariates
+  vector[N] afd;                          // AfD support
+  matrix[ST, L] Z;                        // State-level covariates
+  vector[ST]  east;                       // East Germany dummy
+  array[N] real y;                        // Outcome
 }
 
 parameters{
-  vector[S] gamma_raw;   // standard normal raw state intercept
-  vector[ST] alpha_raw;   // standard normal raw state-year intercept
-  real mu_gamma;        // average across states
+  vector[S] gamma_raw;                    // standard normal raw state intercept
+  vector[ST] alpha_raw;                   // standard normal raw state-year intercept
+  real mu_gamma;                          // average across states
   
-  vector[K] beta_0;      // slopes for individual-level covariates
-  vector[L] beta_1;      // slopes for state-year level covariates
+  vector[K] beta_0;                       // slopes for individual-level covariates
+  vector[L] beta_1;                       // slopes for state-year level covariates
   
-  vector[TT] delta_raw;  // 
-  vector[TT] tau_raw;      //
-  real mu_delta;
-  real mu_tau;
+  vector[TT] delta_raw;                   // standard normal raw AfD varying slope (by year)
+  vector[TT] tau_raw;                     // standard normal raw East varying slope (by year)
+  real mu_delta;                          // average slope AfD
+  real mu_tau;                            // average slope East
   
-  real<lower=0> sigma_y;    // between-individual variation
-  real<lower=0> sigma_alpha;  // between-state-year variation
-  real<lower=0> sigma_gamma;  // between-state variation
-  real<lower=0> sigma_delta;  // between-year variation for slope for AfD
-  real<lower=0> sigma_tau;   // between-year variation for slope for East
+  real<lower=0> sigma_y;                  // between-individual variation
+  real<lower=0> sigma_alpha;              // between-state-year variation
+  real<lower=0> sigma_gamma;              // between-state variation
+  real<lower=0> sigma_delta;              // between-year variation for AfD slope
+  real<lower=0> sigma_tau;                // between-year variation for East slope
 }
 
 transformed parameters {
+  // non-centered parameterization
   vector[TT] delta = mu_delta + sigma_delta * delta_raw;
   vector[TT] tau = mu_tau + sigma_tau * tau_raw;
-  vector[S] gamma = mu_gamma + sigma_gamma * gamma_raw;  // varying intercept for states
+  vector[S] gamma = mu_gamma + sigma_gamma * gamma_raw;   
+  
   vector[ST] alpha_mean = gamma[ss] + east .* tau[ts] + Z * beta_1;
-  vector[ST] alpha = alpha_mean + sigma_alpha * alpha_raw;  // varying intercept for state-years
+  vector[ST] alpha = alpha_mean + sigma_alpha * alpha_raw;  
 }
 
 model {
