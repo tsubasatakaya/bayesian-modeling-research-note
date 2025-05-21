@@ -16,7 +16,7 @@ states <- c(
   "Saarland",
   "Berlin",
   "Brandenburg",
-  "Mecklenburg-Vorpommern",
+  "Mecklenburg Pomerania",
   "Saxony",
   "Saxony-Anhalt",
   "Thuringia"
@@ -38,6 +38,9 @@ state_year_data <- base_data |>
   select(state, state_id, year, year_id, east, unemp_rate, gdp_per_capita) |> 
   distinct()
 
+state_data <- state_year_data |> 
+  select(state, state_id, east) |> 
+  distinct()
 
 #######################
 # Varying slope by year
@@ -62,11 +65,11 @@ Z <- model.matrix(~ 1 + factor(year_id) + gdp_per_capita + unemp_rate,
   ) |> 
   as.matrix()
 Z <- Z[,-1]
-east <- state_year_data$east
+east <- state_data$east
 
 data_stan_year_slope <- list(
   N = nrow(base_data),
-  S = length(unique(state_year_data$state_id)),
+  S = length(unique(base_data$state_id)),
   ST = length(unique(base_data$state_year_id)),
   TT = length(unique(base_data$year_id)),
   K = ncol(X),
@@ -97,37 +100,36 @@ data {
   matrix[N, K] X;                         // Individual-level covariates
   vector[N] afd;                          // AfD support
   matrix[ST, L] Z;                        // State-level covariates
-  vector[ST]  east;                       // East Germany dummy
+  vector[S]  east;                        // East Germany dummy
   array[N] real y;                        // Outcome
 }
 
 parameters{
-  vector[S] gamma_raw;                    // standard normal raw state intercept
   vector[ST] alpha_raw;                   // standard normal raw state-year intercept
-  real mu_gamma;                          // average across states
+  vector[S] gamma_raw;
   
   vector[K] beta_0;                       // slopes for individual-level covariates
   vector[L] beta_1;                       // slopes for state-year level covariates
   
   vector[TT] delta_raw;                   // standard normal raw AfD varying slope (by year)
-  vector[TT] tau_raw;                     // standard normal raw East varying slope (by year)
   real mu_delta;                          // average slope AfD
-  real mu_tau;                            // average slope East
+  
+  real nu;
+  real lambda;
   
   real<lower=0> sigma_y;                  // between-individual variation
   real<lower=0> sigma_alpha;              // between-state-year variation
   real<lower=0> sigma_gamma;              // between-state variation
   real<lower=0> sigma_delta;              // between-year variation for AfD slope
-  real<lower=0> sigma_tau;                // between-year variation for East slope
 }
 
 transformed parameters {
   // non-centered parameterization
   vector[TT] delta = mu_delta + sigma_delta * delta_raw;
-  vector[TT] tau = mu_tau + sigma_tau * tau_raw;
-  vector[S] gamma = mu_gamma + sigma_gamma * gamma_raw;   
   
-  vector[ST] alpha_mean = gamma[ss] + east .* tau[ts] + Z * beta_1;
+  vector[S] gamma = nu + east * lambda + sigma_gamma * gamma_raw;
+  
+  vector[ST] alpha_mean = gamma[ss] + Z * beta_1;
   vector[ST] alpha = alpha_mean + sigma_alpha * alpha_raw;  
 }
 
@@ -135,18 +137,18 @@ model {
   gamma_raw ~ std_normal();
   alpha_raw ~ std_normal();
   delta_raw ~ std_normal();
-  tau_raw ~ std_normal();
   delta ~ normal(0, 10);
   beta_0 ~ normal(0, 10);
   beta_1 ~ normal(0, 10);
-  mu_gamma ~ normal(0, 10);
+  
+  nu ~ normal(0, 10);
+  lambda ~ normal(0, 10);
+  
   mu_delta ~ normal(0, 10);
-  mu_tau ~ normal(0, 10);
   sigma_y ~ normal(0, 10);
   sigma_gamma ~ normal(0, 2);
   sigma_alpha ~ normal(0, 2);
   sigma_delta ~ normal(0, 2);
-  sigma_tau ~ normal(0, 2);
   
   // likelihood
   y ~ normal(alpha[st] + afd .* delta[ti] + X * beta_0, sigma_y);
