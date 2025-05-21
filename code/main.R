@@ -42,13 +42,12 @@ state_year_data <- base_data |>
 #######################
 # Varying slope by year
 #######################
-X <- model.matrix(~ 1 + gender + factor(education) + unemp + unemp_past 
-                  + person_econ_current,
+X <- model.matrix(~ 1 + gender + age + factor(education) + unemp + person_econ_current,
                   data = base_data) |> 
   as.data.frame() |> 
   mutate(
-    across(all_of(c("unemp_past", "person_econ_current")), ~ (.- mean(.)) / sd(.)),
-    across(-all_of(c("unemp_past", "person_econ_current")), ~ . - mean(.))
+    across(all_of(c("age", "person_econ_current")), ~ (.- mean(.)) / sd(.)),
+    across(-all_of(c("age", "person_econ_current")), ~ . - mean(.))
   ) |> 
   as.matrix()
 X <- X[,-1]
