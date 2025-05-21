@@ -14,7 +14,7 @@ states <- c(
   "Saarland",
   "Berlin",
   "Brandenburg",
-  "Mecklenburg-Vorpommern",
+  "Mecklenburg Pomerania",
   "Saxony",
   "Saxony-Anhalt",
   "Thuringia"
@@ -37,7 +37,6 @@ all_data <- list(
 vars_to_check <- c(
   "state",
   "year",
-  "east_west_1",
   "satis_demo",
   "person_econ_current",
   "school_certificate",
@@ -70,15 +69,10 @@ for (i in seq_along(years)) {
     select(-year_birth)
   
   df <- df |> 
-    mutate(across(c(east_west_1, satis_demo, vote_int_first, vote_int_second, 
+    mutate(across(c(satis_demo, vote_int_first, vote_int_second, 
                     party_identification, person_econ_current, 
                     school_certificate,employment, unemp_past, income), as.integer))
-  
-  if ("east_west_2" %in% colnames(df)) {
-    df <-  df |> 
-      filter(east_west_2 > 0) |> 
-      mutate(east_west_2 = as.integer(east_west_2))
-  }
+
     
   print(nrow(df))
   gles_data <- bind_rows(df, gles_data)
@@ -87,11 +81,16 @@ for (i in seq_along(years)) {
 cleaned_gles_data <- gles_data |> 
   mutate(state = case_match(
     state,
+    c("Mecklenburg-Vorpommern", "Mecklenburg-West Pomerania") ~ "Mecklenburg Pomerania",
     c("Lower-Saxony", "Lower Saxony") ~ "Lower Saxony",
     c("Rhineland-Palatinate", "Rhineland Palatinate") ~ "Rhineland Palatinate",
     c("North Rhine-Westfalia", "North Rhine Westphalia") ~ "North Rhine Westphalia",
     .default = state
   )) |> 
+  mutate(east = case_when(state %in% c("Brandenburg", "Berlin", "Mecklenburg Pomerania",
+                                       "Saxony", "Saxony-Anhalt", "Thuringia") ~ 1,
+                          .default = 0),
+         .after = state) |> 
   mutate(state = factor(state, levels = states)) |> 
   mutate(vote_int_first_afd = ifelse(vote_int_first_label == "AfD", 1, 0),
          vote_int_second_afd = ifelse(vote_int_second_label == "AfD", 1, 0),
@@ -100,8 +99,7 @@ cleaned_gles_data <- gles_data |>
                                school_certificate %in% c(3, 4, 6) ~ "middle",
                                school_certificate == 5 ~ "high",
                                .default = NA),
-         unemp = ifelse(employment == 7, 1, 0),
-         east = ifelse(east_west_1 == 1, 1, 0),
+         unemp = ifelse(employment == 7, 1, 0)
          ) |> 
   mutate(education = factor(education, levels = c("low", "middle", "high")),
          satis_demo = 6 - satis_demo) |> # reverse order s.t. 1 = not satisfied, 5 = very satisfied
@@ -122,7 +120,8 @@ state_de_to_en <- c(
   "Hessen" = "Hesse",
   "Bayern" = "Bavaria",
   "Rheinland-Pfalz" = "Rhineland Palatinate",
-  "Thüringen" = "Thuringia"
+  "Thüringen" = "Thuringia",
+  "Mecklenburg-Vorpommern" = "Mecklenburg Pomerania"
 )
 
 

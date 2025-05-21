@@ -2,7 +2,6 @@ mapping_2013 <- c(
   "year" = "year",
   "ID" = "lfdn",
   "state" = "bl",
-  "east_west_1" = "ostwest", # all of Berlin = East
   "gender" = "q1",
   "year_birth" = "q2c",
   "satis_demo" = "q6",
@@ -23,8 +22,6 @@ mapping_2017 <- c(
   "year" = "year",
   "ID" = "lfdn",
   "state" = "bula",
-  "east_west_1" = "ostwest", # all of Berlin = East
-  "east_west_2" = "ostwest2",  # classification of Berlin
   "gender" = "q1",
   "year_birth" = "q2a",
   "satis_demo" = "q6",
@@ -44,8 +41,6 @@ mapping_2021 <- c(
   "year" = "intyear",
   "ID" = "lfdn",
   "state" = "bula",
-  "east_west_1" = "ostwest", # all of Berlin = East
-  "east_west_2" = "ostwest2",  # classification of Berlin
   "gender" = "d1",
   "year_birth" = "d2a",
   "satis_demo" = "q4",
