@@ -19,7 +19,7 @@ states <- c(
   "Saarland",
   "Berlin",
   "Brandenburg",
-  "Mecklenburg-Vorpommern",
+  "Mecklenburg Pomerania",
   "Saxony",
   "Saxony-Anhalt",
   "Thuringia"
@@ -28,6 +28,9 @@ states <- c(
 ################################################################################
 # Prepare original data
 ################################################################################
+base_data |> filter(is.na(state))
+
+
 base_data <- vroom(file.path(data_path, "base_data.csv"),
                    delim = ";") |> 
   mutate(state = factor(state, levels = states),
@@ -38,10 +41,14 @@ base_data <- vroom(file.path(data_path, "base_data.csv"),
          gender = as.integer(factor(gender, levels = c("male", "female"))),
          education = as.integer(factor(education, levels = c("low", "middle", "high")))
   ) |> 
-  filter(party_identification > 0)
+  filter(vote_int_second > 0)
 
 state_year_data <- base_data |> 
   select(state, state_id, year, year_id, east, unemp_rate, gdp_per_capita) |> 
+  distinct()
+
+state_data <- state_year_data |> 
+  select(state, state_id, east) |> 
   distinct()
 
 X <- model.matrix(~ 1 + gender + age + factor(education) + unemp + person_econ_current,
@@ -55,16 +62,15 @@ X <- model.matrix(~ 1 + gender + age + factor(education) + unemp + person_econ_c
 X <- X[,-1]
 afd <- base_data$vote_int_second_afd
 
-Z <- model.matrix(~ 1 + factor(year_id) + gdp_per_capita + unemp_rate,
+Z <- model.matrix(~ 1 + gdp_per_capita + unemp_rate,
                   data = state_year_data) |> 
   as.data.frame() |> 
   mutate(
-    across(all_of(c("gdp_per_capita", "unemp_rate")), ~ (.- mean(.)) / sd(.)),
-    across(-all_of(c("gdp_per_capita", "unemp_rate")), ~ . - mean(.))
+    across(all_of(c("gdp_per_capita", "unemp_rate")), ~ (.- mean(.)) / sd(.))
   ) |> 
   as.matrix()
 Z <- Z[,-1]
-east <- state_year_data$east
+east <- state_data$east
 
 ################################################################################
 # Prepare posterior
@@ -97,16 +103,15 @@ beta_0_posterior <- files_to_read |>
                                    save_path = file.path(posterior_path, "varying_slope_model"),
                                    parameters = "beta_0",
                                    include_warmup = FALSE)) |> 
-  select(!any_of(dplyr::contains("raw")))
-
-# n_sample * n_year matrix
-tau_posterior <- files_to_read |> 
-  map_dfr(~ import_posterior_files(.x,
-                                   save_path = file.path(posterior_path, "varying_slope_model"),
-                                   parameters = "tau",
-                                   include_warmup = FALSE)) |> 
   select(!any_of(dplyr::contains("raw"))) |> 
   as.matrix()
+
+# n_sample vector
+lambda_posterior <- files_to_read |> 
+  map_dfr(~ import_posterior_files(.x,
+                                   save_path = file.path(posterior_path, "varying_slope_model"),
+                                   parameters = "lambda",
+                                   include_warmup = FALSE))
 
 
 ################################################################################
@@ -121,39 +126,50 @@ delta_posterior_long <- delta_posterior |>
   mutate(year_id = as.integer(str_extract(name, "\\d+")),
          parameter = "delta") |> 
   select(-name) |> 
-  map_year_id_to_year()
+  map_year_id_to_year() |> 
+  mutate(name = paste0(parameter, "_", year))
 
-tau_posteior_long <- tau_posterior |> 
-  as_tibble() |> 
-  pivot_longer(everything(), names_to = "name") |> 
-  mutate(year_id = as.integer(str_extract(name, "\\d+")),
-         parameter = "tau") |> 
-  select(-name) |> 
-  map_year_id_to_year()
+lambda_posterior_long <- lambda_posterior |> 
+  mutate(name = "lambda") |> 
+  rename("value" = lambda)
 
-combined_posterior_long <- bind_rows(delta_posterior_long, tau_posteior_long) |> 
-  mutate(year = factor(year),
-         parameter = factor(parameter, levels = c("delta", "tau")))
-
-combined_posterior_long |> 
-  ggplot(aes(x = value, y = fct_rev(year))) +
-  geom_density_ridges(scale = 1.2, 
-                      rel_min_height = 0.01, 
+combined_posterior <- delta_posterior_long |> 
+  select(value, name) |> 
+  bind_rows(lambda_posterior_long) |> 
+  mutate(name = factor(name, levels = c("delta_2013",
+                                        "delta_2017",
+                                        "delta_2021",
+                                        "lambda")))
+coef_ridge_plot <- combined_posterior |> 
+  ggplot(aes(x = value, y = fct_rev(name))) +
+  geom_density_ridges(scale = 1.2,
+                      rel_min_height = 0.01,
                       color = "black",
                       fill = "gray70",
                       alpha = 0.6) +
   geom_vline(xintercept = 0, linetype = "dashed") +
-  facet_wrap(~ parameter, scales = "free_x",
-             labeller = labeller(parameter = c("delta" = "\u03B4",
-                                               "tau" = "\u03C4"))) +
-  theme_minimal() +
+  scale_y_discrete(
+    labels = c(
+      "delta_2013" = TeX("$\\delta_{2013}$"),
+      "delta_2017" = TeX("$\\delta_{2017}$"),
+      "delta_2021" = TeX("$\\delta_{2021}$"),
+      "lambda" = TeX("$\\lambda$")
+    )
+  ) +
   labs(x = "Coefficient", y = "") +
+  theme_minimal() +
   theme(
-    strip.text.x = element_text(face = "bold", size = 14),
-    axis.text.y = element_text(size = 12),              
-    axis.title.x = element_text(size = 13),
-    panel.grid.minor = element_blank()
+    axis.text = element_text(size = 12),              
+    axis.title = element_text(size = 14),
+    panel.grid.minor = element_blank(),
+    plot.margin = margin(10, 10, 10, 10)
   )
+
+ggsave(file.path(output_path, "figures", "coef_ridge_plot.pdf"),
+       coef_ridge_plot, width = 6, height = 10, units = "in",
+       dpi = 300, useDingbats = TRUE)
+
+
 
 #===================
 # Population averaged predictions
