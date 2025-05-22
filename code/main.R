@@ -56,12 +56,11 @@ X <- model.matrix(~ 1 + gender + age + factor(education) + unemp + person_econ_c
 X <- X[,-1]
 afd <- base_data$vote_int_second_afd
 
-Z <- model.matrix(~ 1 + factor(year_id) + gdp_per_capita + unemp_rate,
+Z <- model.matrix(~ 1 + gdp_per_capita + unemp_rate,
                   data = state_year_data) |> 
   as.data.frame() |> 
   mutate(
-    across(all_of(c("gdp_per_capita", "unemp_rate")), ~ (.- mean(.)) / sd(.)),
-    across(-all_of(c("gdp_per_capita", "unemp_rate")), ~ . - mean(.))
+    across(all_of(c("gdp_per_capita", "unemp_rate")), ~ (.- mean(.)) / sd(.))
   ) |> 
   as.matrix()
 Z <- Z[,-1]
@@ -107,6 +106,7 @@ data {
 parameters{
   vector[ST] alpha_raw;                   // standard normal raw state-year intercept
   vector[S] gamma_raw;
+  vector[TT] phi_raw;
   
   vector[K] beta_0;                       // slopes for individual-level covariates
   vector[L] beta_1;                       // slopes for state-year level covariates
@@ -121,15 +121,17 @@ parameters{
   real<lower=0> sigma_alpha;              // between-state-year variation
   real<lower=0> sigma_gamma;              // between-state variation
   real<lower=0> sigma_delta;              // between-year variation for AfD slope
+  real<lower=0> sigma_phi;
 }
 
 transformed parameters {
   // non-centered parameterization
   vector[TT] delta = mu_delta + sigma_delta * delta_raw;
+  vector[TT] phi = sigma_phi * phi_raw;
   
   vector[S] gamma = nu + east * lambda + sigma_gamma * gamma_raw;
   
-  vector[ST] alpha_mean = gamma[ss] + Z * beta_1;
+  vector[ST] alpha_mean = gamma[ss] + Z * beta_1 + phi[ts];
   vector[ST] alpha = alpha_mean + sigma_alpha * alpha_raw;  
 }
 
@@ -137,6 +139,7 @@ model {
   gamma_raw ~ std_normal();
   alpha_raw ~ std_normal();
   delta_raw ~ std_normal();
+  phi_raw ~ std_normal();
   delta ~ normal(0, 10);
   beta_0 ~ normal(0, 10);
   beta_1 ~ normal(0, 10);
@@ -148,6 +151,7 @@ model {
   sigma_y ~ normal(0, 10);
   sigma_gamma ~ normal(0, 2);
   sigma_alpha ~ normal(0, 2);
+  sigma_phi ~ normal(0, 2);
   sigma_delta ~ normal(0, 2);
   
   // likelihood
