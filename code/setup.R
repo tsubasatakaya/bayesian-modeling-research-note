@@ -5,6 +5,7 @@ packages <-  c(
   "tidyverse", 
   "ggplot2",
   "ggridges",
+  "latex2exp",
   "haven",
   "cmdstanr",
   "vroom",
