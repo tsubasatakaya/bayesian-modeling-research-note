@@ -191,7 +191,7 @@ non_afd_data_new <- data_new |>
 
 
 ### AfD supporters
-# Subset relevant parameters
+# Subset relevant parameters and calculate predictions using matrix multiplication
 alpha_afd <- alpha_posterior[, afd_data_new$state_year_id] # n_sample * N_afd
 delta_afd <- delta_posterior[, afd_data_new$year_id]  # n_sample * N_afd
 linpred_afd <- t(alpha_afd) + 
@@ -211,7 +211,7 @@ pred_afd_long <- pred_afd |>
   mutate(group = "afd")
 
 ### Non-AfD supporters
-# Subset relevant parameters
+# Subset relevant parameters and calculate predictions using matrix multiplication
 alpha_non_afd <- alpha_posterior[, non_afd_data_new$state_year_id] # n_sample * N_nonafd
 linpred_non_afd <- t(alpha_non_afd) + 
   as.matrix(non_afd_data_new[,colnames(X)]) %*% t(beta_0_posterior)  # N_nonafd * n_sample
