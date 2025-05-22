@@ -49,6 +49,7 @@ X <- model.matrix(~ 1 + gender + age + factor(education) + unemp + person_econ_c
                   data = base_data) |> 
   as.data.frame() |> 
   mutate(
+    # Scale continuous, demean dummies
     across(all_of(c("age", "person_econ_current")), ~ (.- mean(.)) / sd(.)),
     across(-all_of(c("age", "person_econ_current")), ~ . - mean(.))
   ) |> 
@@ -60,6 +61,7 @@ Z <- model.matrix(~ 1 + gdp_per_capita + unemp_rate,
                   data = state_year_data) |> 
   as.data.frame() |> 
   mutate(
+    # Scale continuous
     across(all_of(c("gdp_per_capita", "unemp_rate")), ~ (.- mean(.)) / sd(.))
   ) |> 
   as.matrix()
@@ -105,8 +107,8 @@ data {
 
 parameters{
   vector[ST] alpha_raw;                   // standard normal raw state-year intercept
-  vector[S] gamma_raw;
-  vector[TT] phi_raw;
+  vector[S] gamma_raw;                    // standard normal raw state intercept
+  vector[TT] phi_raw;                     // stabdard normal raw year shift
   
   vector[K] beta_0;                       // slopes for individual-level covariates
   vector[L] beta_1;                       // slopes for state-year level covariates
@@ -114,14 +116,14 @@ parameters{
   vector[TT] delta_raw;                   // standard normal raw AfD varying slope (by year)
   real mu_delta;                          // average slope AfD
   
-  real nu;
-  real lambda;
+  real nu;                                // West Germany intercept
+  real lambda;                            // Slope for East Germany
   
   real<lower=0> sigma_y;                  // between-individual variation
   real<lower=0> sigma_alpha;              // between-state-year variation
   real<lower=0> sigma_gamma;              // between-state variation
   real<lower=0> sigma_delta;              // between-year variation for AfD slope
-  real<lower=0> sigma_phi;
+  real<lower=0> sigma_phi;                // between-year variation for year shift
 }
 
 transformed parameters {
@@ -136,6 +138,7 @@ transformed parameters {
 }
 
 model {
+  // Priors and hyperpriors
   gamma_raw ~ std_normal();
   alpha_raw ~ std_normal();
   delta_raw ~ std_normal();
