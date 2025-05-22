@@ -28,9 +28,6 @@ states <- c(
 ################################################################################
 # Prepare original data
 ################################################################################
-base_data |> filter(is.na(state))
-
-
 base_data <- vroom(file.path(data_path, "base_data.csv"),
                    delim = ";") |> 
   mutate(state = factor(state, levels = states),
@@ -75,14 +72,14 @@ east <- state_data$east
 ################################################################################
 # Prepare posterior
 ################################################################################
-all_files <- list.files(file.path(posterior_path, "varying_slope_model"),
+all_files <- list.files(file.path(posterior_path),
                         pattern = "\\.csv$")
 files_to_read <- all_files[grep("^vote_intention_second", all_files)]
 
 # n_sample * n_state_year matrix
 alpha_posterior <- files_to_read |> 
   map_dfr(~ import_posterior_files(.x,
-                                   save_path = file.path(posterior_path, "varying_slope_model"),
+                                   save_path = file.path(posterior_path),
                                    parameters = "alpha",
                                    include_warmup = FALSE)) |> 
   select(!any_of(dplyr::contains("raw")) & !any_of(dplyr::contains("mean"))) |> 
@@ -91,7 +88,7 @@ alpha_posterior <- files_to_read |>
 # n_sample * n_year matrix
 delta_posterior <- files_to_read |> 
   map_dfr(~ import_posterior_files(.x,
-                                   save_path = file.path(posterior_path, "varying_slope_model"),
+                                   save_path = file.path(posterior_path),
                                    parameters = "delta",
                                    include_warmup = FALSE)) |> 
   select(!any_of(dplyr::contains("raw"))) |> 
@@ -100,7 +97,7 @@ delta_posterior <- files_to_read |>
 # n_sample * n_covariate_X matrix
 beta_0_posterior <- files_to_read |> 
   map_dfr(~ import_posterior_files(.x,
-                                   save_path = file.path(posterior_path, "varying_slope_model"),
+                                   save_path = file.path(posterior_path),
                                    parameters = "beta_0",
                                    include_warmup = FALSE)) |> 
   select(!any_of(dplyr::contains("raw"))) |> 
@@ -109,7 +106,7 @@ beta_0_posterior <- files_to_read |>
 # n_sample vector
 lambda_posterior <- files_to_read |> 
   map_dfr(~ import_posterior_files(.x,
-                                   save_path = file.path(posterior_path, "varying_slope_model"),
+                                   save_path = file.path(posterior_path),
                                    parameters = "lambda",
                                    include_warmup = FALSE))
 
