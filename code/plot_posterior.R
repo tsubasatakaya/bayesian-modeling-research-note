@@ -159,15 +159,22 @@ coef_ridge_plot <- combined_posterior |>
   labs(x = "Coefficient", y = "") +
   theme_minimal() +
   theme(
-    axis.text = element_text(size = 12),              
+    axis.text = element_text(size = 12),
+    axis.title.x = element_text(margin = margin(t = 15)),
     axis.title = element_text(size = 14),
     panel.grid.minor = element_blank(),
     plot.margin = margin(10, 10, 10, 10)
   )
 
 ggsave(file.path(output_path, "figures", "coef_ridge_plot.pdf"),
-       coef_ridge_plot, width = 6, height = 10, units = "in",
+       coef_ridge_plot, width = 8, height = 7, units = "in",
        dpi = 300, useDingbats = TRUE)
+
+combined_posterior |> 
+  group_by(name) |> 
+  summarize(avg = mean(value),
+            lower = quantile(value, 0.025),
+            upper = quantile(value, 0.975))
 
 
 
