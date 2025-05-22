@@ -242,24 +242,28 @@ pop_pred_summary <- rbind(pred_afd_long, pred_non_afd_long) |>
     3 ~ 2021
   ))
 
-pop_pred_summary |> 
+preds_plot <- pop_pred_summary |> 
   mutate(year = factor(year)) |> 
   ggplot(aes(x = year, y = point, color = group)) +
   geom_pointrange(aes(x = year, y = point, ymin = lower, ymax = upper),
                   position = position_dodge(width = 0.3)) +
   scale_color_manual(name = "",
                      values = c("#0072B2", "#C49A6C"),
-                     labels = c("Support for AfD", "Support for other parties")) +
+                     labels = c("AfD supporters", "Other party supporters")) +
   labs(x = "Year", y = "Predicted satisfaction with democracy") +
   theme_bw() +
   theme(legend.position = "bottom",
-        panel.grid.minor = element_blank())
+        legend.margin = margin(1, 3, 3, 3),
+        legend.text = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        axis.title.x = element_text(margin = margin(t = 15)),
+        axis.title.y = element_text(margin = margin(r = 15)),
+        axis.title = element_text(size = 14),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(10, 10, 10, 10))
 
-
-
-
-
-
-
+ggsave(file.path(output_path, "figures", "preds_plot.pdf"),
+       preds_plot, width = 5, height = 5, units = "in",
+       dpi = 300, useDingbats = TRUE)
 
 
