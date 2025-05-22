@@ -140,7 +140,6 @@ model {
   alpha_raw ~ std_normal();
   delta_raw ~ std_normal();
   phi_raw ~ std_normal();
-  delta ~ normal(0, 10);
   beta_0 ~ normal(0, 10);
   beta_1 ~ normal(0, 10);
   
@@ -175,13 +174,13 @@ fit <- year_slope_model_compiled$sample(
   iter_sampling = 1000,
   refresh = 50,
   adapt_delta = 0.98,
-  output_dir = file.path(posterior_path, "varying_slope_model"),
+  output_dir = file.path(posterior_path),
   output_basename = "vote_intention_second",
   save_warmup = TRUE,
   save_metric = FALSE,
   save_cmdstan_config = FALSE
 )
-fit$save_object(file.path(output_path, "models", "year_slope_vote_intention_second_fitted.RDS"))
+fit$save_object(file.path(output_path, "models", "vote_intention_second_fitted.RDS"))
 
 
 
