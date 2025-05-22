@@ -1,5 +1,5 @@
 source("code/setup.R")
-source("gles_cross_section/column_mapping.R")
+source("code/column_mapping.R")
 
 states <- c(
   "Schleswig-Holstein",
@@ -22,13 +22,13 @@ states <- c(
 
 years <- c(2013, 2017, 2021)
 all_data <- list(
-  read_dta("gles_cross_section/ZA5700_en_v2-0-2.dta") |> 
+  read_dta("data/source/gles_cross_section/ZA5700_en_v2-0-2.dta") |> 
     select(all_of(unname(mapping_2013))) |> 
     rename(all_of(mapping_2013)),
-  read_dta("gles_cross_section/ZA6800_en_v5-1-0.dta") |> 
+  read_dta("data/source/gles_cross_section/ZA6800_en_v5-1-0.dta") |> 
     select(all_of(unname(mapping_2017))) |> 
     rename(all_of(mapping_2017)),
-  read_dta("gles_cross_section/ZA7700_v3-1-0_en.dta") |> 
+  read_dta("data/source/gles_cross_section/ZA7700_v3-1-0_en.dta") |> 
     select(all_of(unname(mapping_2021))) |> 
     rename(all_of(mapping_2021))
 )
@@ -125,7 +125,7 @@ state_de_to_en <- c(
 )
 
 
-gdp_data <- vroom("destatis/82111-0010_en_flat.csv", 
+gdp_data <- vroom("data/source/destatis/82111-0010_en_flat.csv", 
                   delim = ";", col_select = c("time", "1_variable_attribute_label",
                                               "value", "value_unit")) |> 
   filter(time %in% c(2013, 2017, 2021)) |> 
@@ -137,7 +137,7 @@ gdp_data <- vroom("destatis/82111-0010_en_flat.csv",
   mutate(state = recode(state, !!!state_de_to_en)) |> 
   mutate(state = factor(state, levels = states))
 
-pop_data <- vroom("destatis/12411-0010_en_flat.csv",
+pop_data <- vroom("data/source/destatis/12411-0010_en_flat.csv",
                   delim = ";", col_select = c("time", "1_variable_attribute_label",
                                               "value")) |> 
   mutate(year = year(ymd(time)), .before = time) |> 
@@ -148,7 +148,7 @@ pop_data <- vroom("destatis/12411-0010_en_flat.csv",
   mutate(state = recode(state, !!!state_de_to_en)) |> 
   mutate(state = factor(state, levels = states))
 
-unemp_data <- vroom("destatis/13211-0007_en_flat.csv",
+unemp_data <- vroom("data/source/destatis/13211-0007_en_flat.csv",
                     delim = ";", col_select = c("time", "1_variable_attribute_label",
                                                 "value", "value_unit",
                                                 "value_variable_label")) |> 
